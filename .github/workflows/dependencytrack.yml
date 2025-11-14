@@ -32,16 +32,25 @@ jobs:
         shell: pwsh
         run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
   
-      - name: Generate SBOM for .NET
+      - name: Generate SBOM for .NET (per project)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          $solution = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
-          if (-not $solution) {
-            Write-Error "No .sln file found"
+      
+          $projects = Get-ChildItem -Recurse -Filter *.csproj
+          if (-not $projects) {
+            Write-Error "No .csproj files found!"
             exit 1
           }
-          dotnet cyclonedx "$($solution.FullName)" --all-projects -o sbom/bom-dotnet.xml
+      
+          foreach ($proj in $projects) {
+            $name = [IO.Path]::GetFileNameWithoutExtension($proj.FullName)
+            Write-Host "Generating SBOM for $name"
+            dotnet cyclonedx "$($proj.FullName)" --xml --output "sbom/$name.xml"
+          }
+      
+          Write-Host "Merging SBOMs into single bom-dotnet.xml"
+          dotnet cyclonedx merge sbom --output sbom/bom-dotnet.xml
 
   frontend-sbom:
     runs-on: ubuntu-latest
