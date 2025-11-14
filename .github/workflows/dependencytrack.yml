@@ -40,7 +40,7 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          syft dir:. -o cyclonedx-xml > sbom/bom-dotnet.xml
+          syft dir:. -o cyclonedx-json > sbom/bom-dotnet.xml
 
   frontend-sbom:
     runs-on: ubuntu-latest
@@ -79,6 +79,18 @@ jobs:
       - backend-sbom
     runs-on: ubuntu-latest
     steps:          
+      - name: Upload frontend SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-frontend
+          path: sbom/bom-frontend.xml    
+
+      - name: Upload .NET SBOM artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sbom-dotnet
+          path: sbom/bom-dotnet.xml
+          
       # Upload .NET SBOM
       - name: Upload .NET SBOM to Dependency-Track
         env:
