@@ -22,30 +22,24 @@ jobs:
         run: nuget restore ./our.umbraco.org.sln
         
       - name: Install CycloneDX for .NET
-        run: dotnet tool install --global CycloneDX.NuGet
+        run: dotnet tool install --global CycloneDX
 
-      - name: Add dotnet tools to PATH
-        run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      
       - name: Generate SBOM for .NET
         run: |
-          New-Item -ItemType Directory -Force -Path "./sbom" | Out-Null
-
-          $solution = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
-          if ($solution) {
-            $target = $solution.FullName
-          } else {
-            $project = Get-ChildItem -Recurse -Include *.csproj,*.vbproj,*.fsproj | Select-Object -First 1
-            if ($project) {
-              $target = $project.FullName
-            } else {
-              Write-Error "No solution or project found!"
+          mkdir -p ./sbom
+          SOLUTION_FILE=$(find . -name "*.sln" | head -n 1)
+          if [ -z "$SOLUTION_FILE" ]; then
+            PROJECT_FILE=$(find . -name "*.csproj" -o -name "*.fsproj" -o -name "*.vbproj" | head -n 1)
+            if [ -z "$PROJECT_FILE" ]; then
+              echo "No solution or project files found!"
               exit 1
-            }
-          }
-
-          Write-Host "Generating SBOM for $target"
-          cyclonedx-nuget --project-path "$target" --out-file "./sbom/bom-dotnet.xml"
+            else
+              TARGET_FILE="$PROJECT_FILE"
+            fi
+          else
+            TARGET_FILE="$SOLUTION_FILE"
+          fi
+          dotnet-CycloneDX "$TARGET_FILE" --output ./sbom --filename bom-dotnet.xml --output-format Xml --enable-github-licenses --github-bearer-token ${{ secrets.GITHUB_TOKEN }}
 
   frontend-sbom:
     runs-on: ubuntu-latest
