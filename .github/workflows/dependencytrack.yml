@@ -52,6 +52,9 @@ jobs:
 
     steps:
       # Node.js SBOM
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -68,14 +71,13 @@ jobs:
 
       - name: Generate SBOM for Node.js (frontend)
         run: |
-          mkdir -p sbom
-          if [ -f "$FRONTEND_DIR/package.json" ]; then
+          if [ -f "$FRONTEND_DIR/package-lock.json" ] || [ -f "$FRONTEND_DIR/yarn.lock" ]; then
             cd "$FRONTEND_DIR"
-            npx @cyclonedx/cyclonedx-npm -o ../sbom/bom-frontend.xml
+            npx @cyclonedx/cyclonedx-npm -o ../../sbom/bom-frontend.xml
           else
-            echo "No package.json found in $FRONTEND_DIR, skipping frontend SBOM."
+            echo "No package-lock.json or yarn.lock found in $FRONTEND_DIR, skipping frontend SBOM."
           fi
-
+          
   upload:
     needs:
       - frontend-sbom
