@@ -19,7 +19,7 @@ jobs:
 
       # .NET SBOM
       - name: Restore NuGet packages
-        run: nuget restore .\OurUmbraco.sln
+        run: nuget restore ./our.umbraco.org.sln
 
       - name: Install CycloneDX for .NET
         run: dotnet tool install --global CycloneDX.NuGet
