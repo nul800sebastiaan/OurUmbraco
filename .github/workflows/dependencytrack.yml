@@ -16,18 +16,28 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      # .NET SBOM
+  
+      # Required because windows-latest no longer includes a .NET Core SDK
+      - name: Install .NET SDK (6.0)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '6.0.x'
+  
       - name: Restore NuGet packages
-        run: nuget restore ./our.umbraco.org.sln
-        
-      - name: Install CycloneDX for .NET
-        run: dotnet tool install --global CycloneDX
-
+        run: nuget restore .\our.umbraco.org.sln
+  
+      - name: Install CycloneDX for .NET Framework
+        run: dotnet tool install --global CycloneDX.NuGet
+  
+      - name: Add dotnet tools to PATH
+        shell: pwsh
+        run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+  
       - name: Generate SBOM for .NET
+        shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "./sbom" | Out-Null
-
+          New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
+  
           $solution = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
           if ($solution) {
             $target = $solution.FullName
@@ -40,9 +50,9 @@ jobs:
               exit 1
             }
           }
-
+  
           Write-Host "Generating SBOM for $target"
-          dotnet-CycloneDX "$TARGET_FILE" --output ./sbom --filename bom-dotnet.xml --output-format Xml --enable-github-licenses --github-bearer-token ${{ secrets.GITHUB_TOKEN }}
+          cyclonedx-nuget --project-path "$target" --out-file "sbom/bom-dotnet.xml"
 
   frontend-sbom:
     runs-on: ubuntu-latest
