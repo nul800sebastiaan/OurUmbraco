@@ -17,7 +17,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
   
-      # Required because windows-latest no longer includes a .NET Core SDK
       - name: Install .NET SDK (6.0)
         uses: actions/setup-dotnet@v4
         with:
@@ -26,8 +25,8 @@ jobs:
       - name: Restore NuGet packages
         run: nuget restore .\our.umbraco.org.sln
   
-      - name: Install CycloneDX for .NET Framework
-        run: dotnet tool install --global CycloneDX.NuGet
+      - name: Install CycloneDX (modern tool)
+        run: dotnet tool install --global CycloneDX
   
       - name: Add dotnet tools to PATH
         shell: pwsh
@@ -37,22 +36,12 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-  
           $solution = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
-          if ($solution) {
-            $target = $solution.FullName
-          } else {
-            $project = Get-ChildItem -Recurse -Include *.csproj,*.vbproj,*.fsproj | Select-Object -First 1
-            if ($project) {
-              $target = $project.FullName
-            } else {
-              Write-Error "No solution or project found!"
-              exit 1
-            }
+          if (-not $solution) {
+            Write-Error "No .sln file found"
+            exit 1
           }
-  
-          Write-Host "Generating SBOM for $target"
-          cyclonedx-nuget --project-path "$target" --out-file "sbom/bom-dotnet.xml"
+          dotnet cyclonedx "$($solution.FullName)" -o sbom/bom-dotnet.xml
 
   frontend-sbom:
     runs-on: ubuntu-latest
