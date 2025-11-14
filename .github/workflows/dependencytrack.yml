@@ -41,7 +41,7 @@ jobs:
             Write-Error "No .sln file found"
             exit 1
           }
-          dotnet cyclonedx "$($solution.FullName)" -o sbom/bom-dotnet.xml
+          dotnet cyclonedx "$($solution.FullName)" --all-projects -o sbom/bom-dotnet.xml
 
   frontend-sbom:
     runs-on: ubuntu-latest
