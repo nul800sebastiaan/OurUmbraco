@@ -20,9 +20,14 @@ jobs:
       - name: Install Syft
         shell: pwsh
         run: |
-          Invoke-WebRequest -Uri https://raw.githubusercontent.com/anchore/syft/main/install.ps1 -OutFile install.ps1
-          ./install.ps1 -Dest $HOME/syft
-          echo "$HOME/syft" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          $syftUrl = "https://github.com/anchore/syft/releases/latest/download/syft_Windows_x86_64.zip"
+          $zipPath = "$env:TEMP\syft.zip"
+          $dest = "$HOME\syft"
+      
+          Invoke-WebRequest -Uri $syftUrl -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $dest -Force
+      
+          echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
   
       - name: Generate SBOM for .NET (CycloneDX XML)
         shell: pwsh
