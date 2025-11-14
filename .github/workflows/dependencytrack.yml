@@ -26,19 +26,22 @@ jobs:
 
       - name: Generate SBOM for .NET
         run: |
-          mkdir -p ./sbom
-          SOLUTION_FILE=$(find . -name "*.sln" | head -n 1)
-          if [ -z "$SOLUTION_FILE" ]; then
-            PROJECT_FILE=$(find . -name "*.csproj" -o -name "*.fsproj" -o -name "*.vbproj" | head -n 1)
-            if [ -z "$PROJECT_FILE" ]; then
-              echo "No solution or project files found!"
+          New-Item -ItemType Directory -Force -Path "./sbom" | Out-Null
+
+          $solution = Get-ChildItem -Recurse -Filter *.sln | Select-Object -First 1
+          if ($solution) {
+            $target = $solution.FullName
+          } else {
+            $project = Get-ChildItem -Recurse -Include *.csproj,*.vbproj,*.fsproj | Select-Object -First 1
+            if ($project) {
+              $target = $project.FullName
+            } else {
+              Write-Error "No solution or project found!"
               exit 1
-            else
-              TARGET_FILE="$PROJECT_FILE"
-            fi
-          else
-            TARGET_FILE="$SOLUTION_FILE"
-          fi
+            }
+          }
+
+          Write-Host "Generating SBOM for $target"
           dotnet-CycloneDX "$TARGET_FILE" --output ./sbom --filename bom-dotnet.xml --output-format Xml --enable-github-licenses --github-bearer-token ${{ secrets.GITHUB_TOKEN }}
 
   frontend-sbom:
