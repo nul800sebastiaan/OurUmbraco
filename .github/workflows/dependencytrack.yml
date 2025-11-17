@@ -51,13 +51,19 @@ jobs:
         
       - name: Publish to folder
         run: msbuild OurUmbraco.Site\OurUmbraco.Site.csproj /nologo /verbosity:m /t:Build /t:pipelinePreDeployCopyAllFilesToOneFolder /p:_PackageTempDir="\published\"
-
+        
       - name: Generate SBOM for .NET (CycloneDX JSON)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
           $out = Join-Path $PWD "sbom/bom-dotnet.json"
-          syft dir:./published/ -o cyclonedx-json > $out
+          $publishDir = Join-Path $PWD "published/_PublishedWebsites/OurUmbraco.Site"
+          if (-not (Test-Path $publishDir)) {
+            Write-Error "Publish directory not found: $publishDir"
+            Get-ChildItem -Recurse published
+            exit 1
+          }
+          syft "dir:$publishDir" -o cyclonedx-json > $out
           Write-Host "SBOM created at $out"
 
       - name: Upload .NET SBOM artifact
