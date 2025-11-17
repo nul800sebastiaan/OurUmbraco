@@ -11,60 +11,44 @@ env:
   TRACKER_ENDPOINT: "https://ca-live-global-dtrack-api.purplemoss-6e7d841c.westeurope.azurecontainerapps.io/api/v1/bom"
 
 jobs:
-
   # ==========================================
-  # BACKEND (.NET Framework) SBOM via Syft
+  # BACKEND (.NET Framework) SBOM via CycloneDX
   # ==========================================
   backend-sbom:
     runs-on: windows-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Install CycloneDX CLI
+
+      - name: Install CycloneDX CLI (Windows)
         shell: pwsh
         run: |
           $release = Invoke-RestMethod -Uri "https://api.github.com/repos/CycloneDX/cyclonedx-cli/releases/latest"
-      
           Write-Host "Available assets:"
           $release.assets | Select-Object name, browser_download_url | Format-List
-      
-          # Pick Windows x64 exe
+
           $asset = $release.assets | Where-Object { $_.name -eq "cyclonedx-win-x64.exe" }
-      
           if (-not $asset) {
-            Write-Error "Could not find Windows x64 CycloneDX executable."
+            Write-Error "Could not find Windows x64 CycloneDX CLI executable."
             exit 1
           }
-      
+
           $dest = "$HOME\cyclonedx-cli"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
-      
           $exePath = Join-Path $dest "cyclonedx.exe"
-      
           Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $exePath
-      
-          # Add to PATH
           echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-      
           Write-Host "Installed CycloneDX CLI at $exePath"
-                
-      - name: Generate SBOM for .NET Framework
+
+      - name: Generate SBOM for .NET Framework project (source)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          Write-Host "Working directory: $PWD"
-          Get-ChildItem -Recurse -Include *.csproj,*.sln | ForEach-Object { Write-Host "Found: $($_.FullName)" }
-      
           $solution = Join-Path $PWD "our.umbraco.org.sln"
           Write-Host "Using solution: $solution"
-      
           $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
-          Write-Host "Output file: $out"
-      
-          cyclonedx bom --project-file "$solution" --output-file "$out" --output-format json
-      
-          Write-Host "SBOM created at $out"
+          & "$env:USERPROFILE\cyclonedx-cli\cyclonedx.exe" bom --project-file "$solution" --output-format json --output-file "$out"
+          Write-Host "Source SBOM created at $out"
 
       - name: Upload source SBOM
         uses: actions/upload-artifact@v4
@@ -111,7 +95,6 @@ jobs:
           name: sbom-frontend
           path: sbom/bom-frontend.json
 
-
   # ==========================================
   # UPLOAD TO DEPENDENCY-TRACK
   # ==========================================
@@ -121,19 +104,17 @@ jobs:
       - backend-sbom
     runs-on: ubuntu-latest
     steps:
-
       - name: Download .NET SBOM
         uses: actions/download-artifact@v4
         with:
-          name: sbom-dotnet
-          path: sboms/dotnet
+          name: sbom-dotnet-full
+          path: sboms/dotnet-full
 
       - name: Download frontend SBOM
         uses: actions/download-artifact@v4
         with:
           name: sbom-frontend
           path: sboms/frontend
-
 
       - name: Upload .NET SBOM to Dependency-Track
         env:
@@ -145,9 +126,9 @@ jobs:
             -H "accept: application/json" \
             -H "Content-Type: multipart/form-data" \
             -F "autoCreate=true" \
-            -F "projectName=${{ github.event.repository.name }}-backend" \
+            -F "projectName=${{ github.event.repository.name }}-backend-source" \
             -F "projectVersion=${{ github.ref_name }}" \
-            -F "bom=@sboms/dotnet/bom-dotnet-full.json"
+            -F "bom=@sboms/dotnet-full/bom-dotnet-full.json"
 
       - name: Upload Node.js SBOM to Dependency-Track
         env:
@@ -156,13 +137,12 @@ jobs:
           if [ -f sboms/frontend/bom-frontend.json ]; then
             curl --fail-with-body -v -i -w "\nHTTP Status: %{http_code}\n" \
               -X POST "$TRACKER_ENDPOINT" \
-              -H "X-Api-Key: $DTRACK_API_KEY" \
-              -H "accept: application/json" \
-              -H "Content-Type: multipart/form-data" \
-              -F "autoCreate=true" \
-              -F "projectName=${{ github.event.repository.name }}-frontend" \
-              -F "projectVersion=${{ github.ref_name }}" \
-              -F "bom=@sboms/frontend/bom-frontend.json"
+                -H "X-Api-Key: $DTRACK_API_KEY" \
+                -H "accept: application/json" \
+                -H "Content-Type: multipart/form-data" \
+                -F "autoCreate=true" \
+                -F "projectName=${{ github.event.repository.name }}-frontend" \
+                -F "projectVersion=${{ github.ref_name }}" \
+                -F "bom=@sboms/frontend/bom-frontend.json"
           else
             echo "No frontend SBOM to upload."
-          fi
