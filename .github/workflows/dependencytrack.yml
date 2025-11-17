@@ -22,21 +22,29 @@ jobs:
 
       - name: Install CycloneDX CLI (Windows)
         shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/CycloneDX/cyclonedx-cli/releases/latest"
+          $headers = @{ Authorization = "token $env:GH_TOKEN" }
+      
+          $release = Invoke-RestMethod -Headers $headers `
+            -Uri "https://api.github.com/repos/CycloneDX/cyclonedx-cli/releases/latest"
+      
           Write-Host "Available assets:"
           $release.assets | Select-Object name, browser_download_url | Format-List
-
+      
           $asset = $release.assets | Where-Object { $_.name -eq "cyclonedx-win-x64.exe" }
           if (-not $asset) {
             Write-Error "Could not find Windows x64 CycloneDX CLI executable."
             exit 1
           }
-
+      
           $dest = "$HOME\cyclonedx-cli"
           New-Item -ItemType Directory -Force -Path $dest | Out-Null
           $exePath = Join-Path $dest "cyclonedx.exe"
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $exePath
+      
+          Invoke-WebRequest -Headers $headers -Uri $asset.browser_download_url -OutFile $exePath
+      
           echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
           Write-Host "Installed CycloneDX CLI at $exePath"
 
