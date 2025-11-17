@@ -20,7 +20,7 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
+      
       - name: Install CycloneDX CLI
         shell: pwsh
         run: |
@@ -29,27 +29,25 @@ jobs:
           Write-Host "Available assets:"
           $release.assets | Select-Object name, browser_download_url | Format-List
       
-          # Try multiple naming patterns for Windows
-          $asset = $release.assets |
-            Where-Object {
-              $_.name -match 'win' -and $_.name -match '\.zip$'
-            } |
-            Select-Object -First 1
+          # Pick Windows x64 exe
+          $asset = $release.assets | Where-Object { $_.name -eq "cyclonedx-win-x64.exe" }
       
           if (-not $asset) {
-            Write-Error "Could not find any Windows zip asset in the latest release."
+            Write-Error "Could not find Windows x64 CycloneDX executable."
             exit 1
           }
       
-          Write-Host "Selected asset: $($asset.name)"
-      
-          $zipPath = "$env:TEMP\cyclonedx-cli.zip"
           $dest = "$HOME\cyclonedx-cli"
+          New-Item -ItemType Directory -Force -Path $dest | Out-Null
       
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath
-          Expand-Archive -Path $zipPath -DestinationPath $dest -Force
+          $exePath = Join-Path $dest "cyclonedx.exe"
       
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $exePath
+      
+          # Add to PATH
           echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      
+          Write-Host "Installed CycloneDX CLI at $exePath"
           
       - name: Generate SBOM for .NET Framework project (source)
         shell: pwsh
