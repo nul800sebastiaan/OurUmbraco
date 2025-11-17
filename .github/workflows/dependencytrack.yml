@@ -46,6 +46,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
           $solution = Join-Path $PWD "our.umbraco.org.sln"
           Write-Host "Using solution: $solution"
+          Write-Host "Using cyclonedx in: $env:USERPROFILE"
           $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
           & "$env:USERPROFILE\cyclonedx-cli\cyclonedx.exe" bom --project-file "$solution" --output-format json --output-file "$out"
           Write-Host "Source SBOM created at $out"
