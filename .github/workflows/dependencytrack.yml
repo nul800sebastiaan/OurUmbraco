@@ -21,56 +21,35 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Syft (Windows)
+      - name: Download CycloneDX-NuGet (self-contained EXE)
         shell: pwsh
         run: |
-          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/anchore/syft/releases/latest"
-          $asset = $release.assets | Where-Object { $_.name -match "windows_amd64.zip$" }
-
-          if (-not $asset) {
-            Write-Error "Could not find Syft Windows binary in latest release."
-            exit 1
-          }
-
-          $zipPath = "$env:TEMP\syft.zip"
-          $dest = "$HOME\syft"
-
-          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath
-          Expand-Archive -Path $zipPath -DestinationPath $dest -Force
-
+          $url = "https://github.com/CycloneDX/cyclonedx-nuget/releases/latest/download/cyclonedx-nuget-win-x64.zip"
+          $zip = "$env:TEMP\cyclonedx.zip"
+          $dest = "$env:USERPROFILE\cyclonedx"
+          Invoke-WebRequest -Uri $url -OutFile $zip
+          Expand-Archive $zip -DestinationPath $dest -Force
           echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-
-      - name: Setup MSBuild path
-        uses: microsoft/setup-msbuild@v1.0.2
-
-      - name: Setup NuGet
-        uses: NuGet/setup-nuget@v1.0.5
-
+  
       - name: Restore NuGet packages
-        run: nuget restore
+        run: nuget restore .\our.umbraco.org.sln
         
-      - name: Publish to folder
-        run: msbuild OurUmbraco.Site\OurUmbraco.Site.csproj /nologo /verbosity:m /t:Build /t:pipelinePreDeployCopyAllFilesToOneFolder /p:_PackageTempDir="\published\"
-        
-      - name: Generate SBOM for .NET (CycloneDX JSON)
+      - name: Generate CycloneDX SBOM (NuGet graph)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          $out = Join-Path $PWD "sbom/bom-dotnet.json"
-          $publishDir = Join-Path $PWD "OurUmbraco.Site"
-          if (-not (Test-Path $publishDir)) {
-            Write-Error "Publish directory not found: $publishDir"
-            Get-ChildItem -Recurse published
-            exit 1
-          }
-          syft "dir:$publishDir" -o cyclonedx-json > $out
-          Write-Host "SBOM created at $out"
-
-      - name: Upload .NET SBOM artifact
+          $out = "sbom/bom-dotnet-full.json"
+          # Solution-level analysis = full dependency graph
+          cyclonedx-nuget.exe .\our.umbraco.org.sln `
+              --format json `
+              --out $out
+          Write-Host "Full dependency SBOM created at $out"
+       
+      - name: Upload source SBOM (full)
         uses: actions/upload-artifact@v4
         with:
-          name: sbom-dotnet
-          path: sbom/bom-dotnet.json
+          name: sbom-dotnet-full
+          path: sbom/bom-dotnet-full.json
 
   # ==========================================
   # FRONTEND (Node) SBOM
