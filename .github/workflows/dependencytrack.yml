@@ -21,30 +21,39 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Add modern NuGet feed
-        run: dotnet nuget add source https://api.nuget.org/v3/index.json -n nuget.org.v3
-        
-      - name: Disable default NuGet v2 source
-        run: dotnet nuget disable source nuget.org
-
-      - name: Install CycloneDX for .NET (modern)
-        run: dotnet tool install --global CycloneDX.Dotnet --add-source https://api.nuget.org/v3/index.json
-            
-      - name: Add dotnet tools to PATH
+      - name: Install CycloneDX CLI
         shell: pwsh
-        run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        run: |
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/CycloneDX/cyclonedx-cli/releases/latest"
+          $asset = $release.assets | Where-Object { $_.name -match "windows.zip$" }
+          if (-not $asset) { 
+            Write-Error "Could not find CycloneDX CLI Windows asset."
+            exit 1
+          }
+      
+          $zipPath = "$env:TEMP\cyclonedx-cli.zip"
+          $dest = "$HOME\cyclonedx-cli"
+      
+          Invoke-WebRequest -Uri $asset.browser_download_url -OutFile $zipPath
+          Expand-Archive -Path $zipPath -DestinationPath $dest -Force
+      
+          echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       
       - name: Generate SBOM for .NET Framework project (source)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
+      
           $solution = Join-Path $PWD "our.umbraco.org.sln"
+          $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
       
-          dotnet cyclonedx bom --project-file "$solution" --output-format Json --output "$out"
+          cyclonedx bom `
+            --project-file "$solution" `
+            --output-format json `
+            --output-file "$out"
       
-          Write-Host "Source SBOM created at $out"
-  
+          Write-Host "SBOM created at $out"
+
       - name: Upload source SBOM
         uses: actions/upload-artifact@v4
         with:
