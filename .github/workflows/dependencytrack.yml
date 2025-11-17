@@ -32,9 +32,13 @@ jobs:
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
+          
+          $solution = Join-Path $PWD "our.umbraco.org.sln"
+          Write-Host "Using solution: $solution"
+      
           $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
       
-          dotnet cyclonedx --project-file ".\our.umbraco.org.sln" --format json --output "$out"
+          dotnet cyclonedx --project-file "$solution" --format json --output "$out"
       
           Write-Host "Source SBOM created at $out"
   
