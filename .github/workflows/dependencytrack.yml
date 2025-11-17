@@ -31,14 +31,36 @@ jobs:
       - name: Generate SBOM for .NET Framework project (source)
         shell: pwsh
         run: |
+          # Create output dir
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          
-          $solution = Join-Path $PWD "our.umbraco.org.sln"
-          Write-Host "Using solution: $solution"
       
+          # Create an isolated working directory for CycloneDX
+          $iso = Join-Path $env:TEMP "cyclonedx-scan"
+          if (Test-Path $iso) { Remove-Item -Recurse -Force $iso }
+          New-Item -ItemType Directory -Force -Path $iso | Out-Null
+      
+          Write-Host "Isolated scan dir: $iso"
+      
+          # Copy only the files CycloneDX needs
+          Copy-Item "our.umbraco.org.sln" $iso
+      
+          # Copy project folders (but only project files + packages.config)
+          $projects = Get-ChildItem -Recurse -File -Include *.csproj,packages.config
+          foreach ($p in $projects) {
+            $targetPath = Join-Path $iso $p.DirectoryName.Substring($PWD.Path.Length)
+            New-Item -ItemType Directory -Force -Path $targetPath | Out-Null
+            Copy-Item $p.FullName $targetPath
+          }
+      
+          Write-Host "Copied $(Get-ChildItem -Recurse $iso | Measure-Object).Count files into isolated scan dir."
+      
+          # Prepare output path
           $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
       
-          dotnet cyclonedx --project-file "$solution" --format json --output "$out"
+          # Run CycloneDX in the isolated environment
+          Push-Location $iso
+          dotnet cyclonedx --project-file ".\our.umbraco.org.sln" --format json --output "$out"
+          Pop-Location
       
           Write-Host "Source SBOM created at $out"
   
