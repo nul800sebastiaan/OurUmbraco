@@ -28,39 +28,21 @@ jobs:
         shell: pwsh
         run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
   
+      - name: Install CycloneDX for .NET (modern)
+        run: dotnet tool install --global CycloneDX.Dotnet
+      
+      - name: Add dotnet tools to PATH
+        shell: pwsh
+        run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+      
       - name: Generate SBOM for .NET Framework project (source)
         shell: pwsh
         run: |
-          # Create output dir
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-      
-          # Create an isolated working directory for CycloneDX
-          $iso = Join-Path $env:TEMP "cyclonedx-scan"
-          if (Test-Path $iso) { Remove-Item -Recurse -Force $iso }
-          New-Item -ItemType Directory -Force -Path $iso | Out-Null
-      
-          Write-Host "Isolated scan dir: $iso"
-      
-          # Copy only the files CycloneDX needs
-          Copy-Item "our.umbraco.org.sln" $iso
-      
-          # Copy project folders (but only project files + packages.config)
-          $projects = Get-ChildItem -Recurse -File -Include *.csproj,packages.config
-          foreach ($p in $projects) {
-            $targetPath = Join-Path $iso $p.DirectoryName.Substring($PWD.Path.Length)
-            New-Item -ItemType Directory -Force -Path $targetPath | Out-Null
-            Copy-Item $p.FullName $targetPath
-          }
-      
-          Write-Host "Copied $(Get-ChildItem -Recurse $iso | Measure-Object).Count files into isolated scan dir."
-      
-          # Prepare output path
           $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
+          $solution = Join-Path $PWD "our.umbraco.org.sln"
       
-          # Run CycloneDX in the isolated environment
-          Push-Location $iso
-          dotnet cyclonedx --project-file ".\our.umbraco.org.sln" --format json --output "$out"
-          Pop-Location
+          dotnet cyclonedx bom --project-file "$solution" --output-format Json --output "$out"
       
           Write-Host "Source SBOM created at $out"
   
