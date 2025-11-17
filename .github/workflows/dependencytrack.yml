@@ -22,8 +22,8 @@ jobs:
         uses: actions/checkout@v4
   
       - name: Install CycloneDX for .NET (modern)
-        run: dotnet tool install --global CycloneDX.Dotnet
-      
+        run: dotnet tool install --global CycloneDX.Dotnet --add-source https://api.nuget.org/v3/index.json
+            
       - name: Add dotnet tools to PATH
         shell: pwsh
         run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
