@@ -23,7 +23,10 @@ jobs:
         
       - name: Add modern NuGet feed
         run: dotnet nuget add source https://api.nuget.org/v3/index.json -n nuget.org.v3
- 
+        
+      - name: Disable default NuGet v2 source
+        run: dotnet nuget disable source nuget.org
+
       - name: Install CycloneDX for .NET (modern)
         run: dotnet tool install --global CycloneDX.Dotnet --add-source https://api.nuget.org/v3/index.json
             
