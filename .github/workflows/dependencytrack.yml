@@ -48,19 +48,21 @@ jobs:
           echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       
           Write-Host "Installed CycloneDX CLI at $exePath"
-          
-      - name: Generate SBOM for .NET Framework project (source)
+                
+      - name: Generate SBOM for .NET Framework
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          
-          $solution = Join-Path $PWD "our.umbraco.org.sln"
-          $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
+          Write-Host "Working directory: $PWD"
+          Get-ChildItem -Recurse -Include *.csproj,*.sln | ForEach-Object { Write-Host "Found: $($_.FullName)" }
       
-          cyclonedx bom `
-            --project-file "$solution" `
-            --output-file "$out" `
-            --output-format json
+          $solution = Join-Path $PWD "our.umbraco.org.sln"
+          Write-Host "Using solution: $solution"
+      
+          $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
+          Write-Host "Output file: $out"
+      
+          cyclonedx bom --project-file "$solution" --output-file "$out" --output-format json
       
           Write-Host "SBOM created at $out"
 
