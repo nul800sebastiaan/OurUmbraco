@@ -41,17 +41,19 @@ jobs:
         shell: pwsh
         run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
   
-      - name: Generate full dependency SBOM for .NET (source)
+      - name: Generate SBOM for .NET Framework project (source)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
           $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
-  
-          dotnet cyclonedx .\our.umbraco.org.sln `
+      
+          dotnet cyclonedx `
+            --project-file .\our.umbraco.org.sln `
             --format json `
             --output $out
-  
+      
           Write-Host "Source SBOM created at $out"
+
   
       - name: Upload source SBOM
         uses: actions/upload-artifact@v4
