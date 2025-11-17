@@ -20,32 +20,32 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-
-      - name: Download CycloneDX-NuGet (self-contained EXE)
-        shell: pwsh
-        run: |
-          $url = "https://github.com/CycloneDX/cyclonedx-nuget/releases/latest/download/cyclonedx-nuget-win-x64.zip"
-          $zip = "$env:TEMP\cyclonedx.zip"
-          $dest = "$env:USERPROFILE\cyclonedx"
-          Invoke-WebRequest -Uri $url -OutFile $zip
-          Expand-Archive $zip -DestinationPath $dest -Force
-          echo "$dest" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
   
-      - name: Restore NuGet packages
-        run: nuget restore .\our.umbraco.org.sln
-        
-      - name: Generate CycloneDX SBOM (NuGet graph)
+      - name: Install .NET SDK (8.0)
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'        
+
+      - name: Install CycloneDX for .NET (modern)
+        run: dotnet tool install --global CycloneDX
+  
+      - name: Add dotnet tools to PATH
+        shell: pwsh
+        run: echo "$env:USERPROFILE\.dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+  
+      - name: Generate full dependency SBOM for .NET (source)
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path "sbom" | Out-Null
-          $out = "sbom/bom-dotnet-full.json"
-          # Solution-level analysis = full dependency graph
-          cyclonedx-nuget.exe .\our.umbraco.org.sln `
-              --format json `
-              --out $out
-          Write-Host "Full dependency SBOM created at $out"
-       
-      - name: Upload source SBOM (full)
+          $out = Join-Path $PWD "sbom/bom-dotnet-full.json"
+  
+          dotnet cyclonedx .\our.umbraco.org.sln `
+            --format json `
+            --output $out
+  
+          Write-Host "Source SBOM created at $out"
+  
+      - name: Upload source SBOM
         uses: actions/upload-artifact@v4
         with:
           name: sbom-dotnet-full
@@ -126,8 +126,7 @@ jobs:
             -F "autoCreate=true" \
             -F "projectName=${{ github.event.repository.name }}-backend" \
             -F "projectVersion=${{ github.ref_name }}" \
-            -F "bom=@sboms/dotnet/bom-dotnet.json"
-
+            -F "bom=@sboms/dotnet/bom-dotnet-full.json"
 
       - name: Upload Node.js SBOM to Dependency-Track
         env:
