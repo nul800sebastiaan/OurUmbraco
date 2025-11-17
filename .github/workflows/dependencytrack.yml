@@ -20,7 +20,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-  
+        
+      - name: Debug folder
+        shell: pwsh
+        run: |
+          Write-Host "Repo root:"
+          Get-ChildItem -Name
+          Write-Host "`nRecurse:"
+          Get-ChildItem -Recurse -Filter *.sln  
+          
       - name: Install .NET SDK (8.0)
         uses: actions/setup-dotnet@v4
         with:
